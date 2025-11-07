@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Pencil } from "lucide-react";
+import TagInput from "./tag-input";
+import { toast } from "sonner";
 
 interface EditBookmarkModalProps {
   bookmark: Bookmark;
@@ -99,19 +101,32 @@ export function EditBookmarkModal({ bookmark }: EditBookmarkModalProps) {
           <div className="grid gap-2">
             <Label>Description</Label>
             <Textarea
+              id="description"
               name="description"
               value={form.description}
-              onChange={handleChange}
+              onChange={(e) => {
+                if (e.target.value.length <= 200) {
+                  handleChange(e);
+                } else {
+                  toast.info("Description is limited to 200 characters");
+                }
+              }}
+              placeholder="Short description..."
+              rows={3}
             />
+            <p className="text-xs text-muted-foreground">
+              {form.description.length}/200 characters
+            </p>
           </div>
 
           <div className="grid gap-2">
             <Label>Tags</Label>
-            <Input
-              name="tags"
-              value={form.tags}
-              onChange={handleChange}
-              placeholder="react, dev, ui"
+            <TagInput
+              value={form.tags.split(",").filter(Boolean)}
+              onChange={(tags) =>
+                setForm((prev) => ({ ...prev, tags: tags.join(",") }))
+              }
+              limit={5}
             />
           </div>
 

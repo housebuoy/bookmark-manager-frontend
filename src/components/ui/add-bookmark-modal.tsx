@@ -155,17 +155,16 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
               {form.description.length}/200 characters
             </p>
           </div>
-<div className="grid gap-2">
-  <Label htmlFor="tags">Tags</Label>
-  <TagInput
-    value={form.tags.split(",").filter(Boolean)}
-    onChange={(tags) =>
-      setForm((prev) => ({ ...prev, tags: tags.join(",") }))
-    }
-    limit={5}
-  />
-</div>
-
+          <div className="grid gap-2">
+            <Label htmlFor="tags">Tags</Label>
+            <TagInput
+              value={form.tags.split(",").filter(Boolean)}
+              onChange={(tags) =>
+                setForm((prev) => ({ ...prev, tags: tags.join(",") }))
+              }
+              limit={5}
+            />
+          </div>
 
           <Button type="submit" className="w-full">
             Save Bookmark
