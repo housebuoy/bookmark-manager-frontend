@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model bookmark {
+  id            String          @id @db.Uuid
+  date_added    DateTime?       @db.Timestamp(6)
+  description   String?
+  favicon       String?         @db.VarChar(255)
+  is_archived   Boolean
+  is_pinned     Boolean
+  last_visited  DateTime?       @db.Timestamp(6)
+  title         String?         @db.VarChar(255)
+  url           String?         @db.VarChar(255)
+  view_count    Int
+  bookmark_tags bookmark_tags[]
+}
+
+model bookmark_tags {
+  bookmark_id String   @db.Uuid
+  tag_id      BigInt
+  tag         tag      @relation(fields: [tag_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fkhg0rc89ku8o4v35r1esax6w6o")
+  bookmark    bookmark @relation(fields: [bookmark_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fkp1xrm4c4p6gtsai6a3d2pms98")
+
+  @@id([bookmark_id, tag_id])
+}
+
+model tag {
+  id            BigInt          @id @default(autoincrement())
+  name          String?         @db.VarChar(255)
+  bookmark_tags bookmark_tags[]
+}

@@ -51,9 +51,18 @@ export const BookmarkCard = ({
   bookmark,
   layout = "grid",
 }: BookmarkCardProps) => {
-  const { togglePin, deleteBookmark, toggleArchive } = useBookmarkStore();
+  const { togglePin, deleteBookmark, toggleArchive, incrementViewCount } =
+    useBookmarkStore();
   const [open, setOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+
+  const openAndMark = (url: string, id: string) => {
+    // Fire the request but don’t await — it will still be sent
+    Promise.resolve(incrementViewCount(id)).catch((e) => console.error(e));
+    // Open the link immediately
+    window.open(url, "_blank", "noopener,noreferrer");
+    console.log("Opened URL:", url);
+  };
 
   return (
     <Card
@@ -87,8 +96,8 @@ export const BookmarkCard = ({
           <CardDescription>
             <LinkPreview
               url={bookmark.url}
+              bookmarkId={bookmark.id}
               className="text-xs font-medium text-primary hover:underline block truncate cursor-pointer"
-              // onClick={() => window.open(bookmark.url, "_blank")}
             >
               {bookmark.url
                 ? (() => {
@@ -112,7 +121,13 @@ export const BookmarkCard = ({
               <DropdownMenuContent align="end" className="w-36">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openAndMark(bookmark.url, bookmark.id);
+                  }}
+                >
                   <ExternalLink className="h-4 w-4 mr-2" /> Open
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -203,7 +218,7 @@ export const BookmarkCard = ({
           <FaHistory className="w-2.5 h-2.5" />
           <p className="text-xs text-muted-foreground">
             {bookmark.lastVisited
-              ? `Visited ${formatDistanceToNow(new Date(bookmark.lastVisited), {
+              ? `${formatDistanceToNow(new Date(bookmark.lastVisited), {
                   addSuffix: true,
                 })}`
               : "Never visited"}

@@ -48,6 +48,8 @@ interface BookmarkStore {
   pinnedBookmarks: Bookmark[];
   loadPinnedBookmarks: () => Promise<void>;
   refreshKey: number;
+  searchQuery?: string;
+  setSearchQuery: (value: string) => void;
 }
 const MAX_PINNED = 5;
 
@@ -59,17 +61,43 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
   setShowArchived: (value: boolean) => set({ showArchived: value }),
   pinnedBookmarks: [],
   refreshKey: 0,
-  
+  searchQuery: "",
+  setSearchQuery: (value) => set({ searchQuery: value }),
 
   addBookmark: (bookmark) =>
-    set((state) => ({ bookmarks: [...state.bookmarks, bookmark] })),
+    set((state): Partial<BookmarkStore> => {
+      const exists = state.bookmarks.some(
+        (b) => b.url.trim().toLowerCase() === bookmark.url.trim().toLowerCase()
+      );
+
+      if (exists) {
+        toast.error("A bookmark with this link already exists.");
+        return {}; // Return empty object instead of void
+      }
+
+      return { bookmarks: [...state.bookmarks, bookmark] };
+    }),
 
   updateBookmark: (id, updated) =>
-    set((state) => ({
-      bookmarks: state.bookmarks.map((b) =>
-        b.id === id ? { ...b, ...updated } : b
-      ),
-    })),
+    set((state): Partial<BookmarkStore> => {
+      const updatedUrl = updated.url?.trim().toLowerCase();
+
+      if (
+        updatedUrl &&
+        state.bookmarks.some(
+          (b) => b.id !== id && b.url.trim().toLowerCase() === updatedUrl
+        )
+      ) {
+        toast.error("A bookmark with this link already exists.");
+        return {}; // ✅ void = skip update
+      }
+
+      return {
+        bookmarks: state.bookmarks.map((b) =>
+          b.id === id ? { ...b, ...updated } : b
+        ),
+      };
+    }),
 
   deleteBookmark: async (id: string) => {
     try {
@@ -83,58 +111,61 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     }
   },
 
-  // togglePin: async (id: string) => {
-  //   try {
-  //     const { data: updated } = await axios.patch<Bookmark>(
-  //       `http://localhost:8080/api/bookmarks/${id}/pin`
-  //     );
+  togglePin: async (id: string) => {
+    const { bookmarks } = get();
+    const bookmark = bookmarks.find((b) => b.id === id);
+    if (!bookmark) return;
 
-  //     set((state) => ({
-  //       bookmarks: state.bookmarks.map((b) => (b.id === id ? updated : b)),
-  //       pinnedBookmarks: updated.isPinned
-  //         ? [updated, ...state.pinnedBookmarks.filter((b) => b.id !== id)]
-  //         : state.pinnedBookmarks.filter((b) => b.id !== id),
-  //     }));
-  //   } catch (err) {
-  //     console.error("Failed to toggle pin:", err);
-  //   }
-  // },
-
-togglePin: async (id: string) => {
-  const { bookmarks } = get();
-  const bookmark = bookmarks.find((b) => b.id === id);
-  if (!bookmark) return;
-
-  // 🚫 Prevent pinning more than limit
-  if (!bookmark.isPinned) {
-    const pinnedCount = bookmarks.filter((b) => b.isPinned).length;
-    if (pinnedCount >= MAX_PINNED) {
-      toast.error(`You can only pin up to ${MAX_PINNED} bookmarks.`);
-      return;
+    // 🚫 Prevent pinning more than limit
+    if (!bookmark.isPinned) {
+      const pinnedCount = bookmarks.filter((b) => b.isPinned).length;
+      if (pinnedCount >= MAX_PINNED) {
+        toast.error(`You can only pin up to ${MAX_PINNED} bookmarks.`);
+        return;
+      }
     }
-  }
 
-  try {
-    const { data: updated } = await axios.patch(
-      `http://localhost:8080/api/bookmarks/${id}/pin`
-    );
+    try {
+      const { data: updated } = await axios.patch(
+        `http://localhost:8080/api/bookmarks/${id}/pin`
+      );
 
-    set({
-      bookmarks: bookmarks.map((b) => (b.id === id ? updated : b)),
-    });
-  } catch (err) {
-    console.error("Failed to toggle pin:", err);
-  }
-},
+      set({
+        bookmarks: bookmarks.map((b) => (b.id === id ? updated : b)),
+      });
+    } catch (err) {
+      console.error("Failed to toggle pin:", err);
+    }
+  },
 
-
-
-  incrementViewCount: (id) =>
+  incrementViewCount: async (id: string) => {
+    // optimistic update: increment local immediately
     set((state) => ({
       bookmarks: state.bookmarks.map((b) =>
-        b.id === id ? { ...b, viewCount: b.viewCount + 1 } : b
+        b.id === id
+          ? {
+              ...b,
+              viewCount: b.viewCount + 1,
+              lastVisited: new Date().toISOString(),
+            }
+          : b
       ),
-    })),
+    }));
+
+    try {
+      const { data: updated } = await axios.patch<Bookmark>(
+        `http://localhost:8080/api/bookmarks/${id}/view`
+      );
+      // sync with backend response (in case server has canonical time)
+      set((state) => ({
+        bookmarks: state.bookmarks.map((b) => (b.id === id ? updated : b)),
+      }));
+    } catch (err) {
+      console.error("Failed to increment view count:", err);
+      // optional: roll back optimistic increment on failure
+      // set((state) => ({ bookmarks: state.bookmarks.map(b => b.id === id ? { ...b, viewCount: Math.max(0, b.viewCount - 1) } : b) }));
+    }
+  },
 
   setSortBy: (option) => set({ sortBy: option }),
 
@@ -184,55 +215,59 @@ togglePin: async (id: string) => {
     }));
   },
 
-toggleArchive: async (id) => {
-  const bookmark = get().bookmarks.find((b) => b.id === id);
-  if (!bookmark) return;
+  toggleArchive: async (id) => {
+    const bookmark = get().bookmarks.find((b) => b.id === id);
+    if (!bookmark) return;
 
-  try {
-    const { data: updated } = await axios.patch<Bookmark>(
-      `http://localhost:8080/api/bookmarks/${id}/archive`
-    );
+    try {
+      const { data: updated } = await axios.patch<Bookmark>(
+        `http://localhost:8080/api/bookmarks/${id}/archive`
+      );
 
-    // Force unpin if the bookmark is now archived
-    const modified = updated.isArchived
-      ? { ...updated, isPinned: false }
-      : updated;
+      // Force unpin if the bookmark is now archived
+      const modified = updated.isArchived
+        ? { ...updated, isPinned: false }
+        : updated;
 
-    set({
-      bookmarks: get().bookmarks.map((b) => (b.id === id ? modified : b)),
-    });
+      set({
+        bookmarks: get().bookmarks.map((b) => (b.id === id ? modified : b)),
+      });
 
-    if (modified.isArchived) {
-      toast.info("Bookmark archived and unpinned");
-    } else {
-      toast.success("Bookmark restored");
+      if (modified.isArchived) {
+        toast.info("Bookmark archived and unpinned");
+      } else {
+        toast.success("Bookmark restored");
+      }
+
+      // Refresh bookmarks
+      set((state) => ({
+        refreshKey: state.refreshKey + 1,
+      }));
+    } catch (err) {
+      console.error("Failed to toggle archive:", err);
+      toast.error("Failed to update bookmark");
     }
-
-    // Refresh bookmarks
-    set((state) => ({
-      refreshKey: state.refreshKey + 1,
-    }));
-
-  } catch (err) {
-    console.error("Failed to toggle archive:", err);
-    toast.error("Failed to update bookmark");
-  }
-},
-
+  },
 
   filteredBookmarks: () => {
-    const { bookmarks, selectedTags, showArchived } = get();
+    const { bookmarks, selectedTags, showArchived, searchQuery } = get();
 
     return bookmarks.filter((b) => {
-      // Only show non-archived unless showArchived is true
       const archiveCheck = showArchived ? b.isArchived : !b.isArchived;
 
-      // If no tags are selected, include all that pass archive check
       const tagCheck =
         selectedTags.length === 0 ||
         b.tags.some((t) => selectedTags.includes(t.name));
 
-      return archiveCheck && tagCheck;
+      const search =
+        (searchQuery ?? "").trim().length === 0 ||
+        b.title.toLowerCase().includes((searchQuery ?? "").toLowerCase()) ||
+        b.description
+          .toLowerCase()
+          .includes((searchQuery ?? "").toLowerCase()) ||
+        b.url.toLowerCase().includes((searchQuery ?? "").toLowerCase());
+
+      return archiveCheck && tagCheck && search;
     });
   },
 
@@ -259,4 +294,5 @@ toggleArchive: async (id) => {
       console.error("Failed to fetch pinned bookmarks:", err);
     }
   },
+
 }));

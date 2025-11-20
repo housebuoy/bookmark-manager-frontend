@@ -6,12 +6,13 @@ import { useEffect, useState } from "react";
 import { BookmarkCard } from "@/components/ui/bookmark-card";
 import { useBookmarkStore } from "@/stores/bookmark-store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SortByDropdown } from "@/components/ui/sort-by-dropdown";
 
 export default function Home() {
   const [isGrid, setIsGrid] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  const { loadBookmarks, filteredBookmarks, refreshKey } = useBookmarkStore();
+  const { loadBookmarks, filteredBookmarks, sortBy, setSortBy, refreshKey } = useBookmarkStore();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -27,6 +28,18 @@ export default function Home() {
   const sortedBookmarks = [...filtered].sort((a, b) =>
     a.isPinned === b.isPinned ? 0 : a.isPinned ? -1 : 1
   );
+
+  const sorted = [...filtered].sort((a, b) => {
+  switch (sortBy) {
+    case "recently_visited":
+      return new Date(b.lastVisited).getTime() - new Date(a.lastVisited).getTime();
+    case "most_visited":
+      return b.viewCount - a.viewCount;
+    case "recently_added":
+    default:
+      return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
+  }
+});
   
 
   return (
@@ -34,6 +47,7 @@ export default function Home() {
       <div className="flex justify-between ml-5">
         <h1 className="text-2xl font-semibold">All Bookmarks</h1>
         <div className="flex items-center justify-between gap-2">
+          <SortByDropdown currentSort={sortBy} onSortChange={setSortBy} />
           <Button
             variant="ghost"
             aria-label="Toggle layout"

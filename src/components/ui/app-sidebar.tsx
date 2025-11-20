@@ -39,7 +39,7 @@ export function AppSidebar() {
             className={cn(
               "flex items-center transition-all duration-300 bg-accent rounded",
               // Remove extra padding when collapsed
-              "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:px-0"
             )}
           >
             <div

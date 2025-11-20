@@ -9,7 +9,7 @@ import {
   useMotionValue,
   useSpring,
 } from "motion/react";
-
+import { useBookmarkStore } from "@/stores/bookmark-store";
 import { cn } from "@/lib/utils";
 
 type LinkPreviewProps = {
@@ -20,6 +20,8 @@ type LinkPreviewProps = {
   height?: number;
   quality?: number;
   layout?: string;
+  bookmarkId?: string;
+  onClick?: (event: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => void;
 } & (
   | { isStatic: true; imageSrc: string }
   | { isStatic?: false; imageSrc?: never }
@@ -29,10 +31,12 @@ export const LinkPreview = ({
   children,
   url,
   className,
+  bookmarkId,
   width = 200,
   height = 125,
   isStatic = false,
   imageSrc = "",
+  onClick,
 }: LinkPreviewProps) => {
   let src;
   if (!isStatic) {
@@ -53,8 +57,20 @@ export const LinkPreview = ({
   }
 
   const [isOpen, setOpen] = React.useState(false);
+  const { incrementViewCount } = useBookmarkStore();
 
   const [isMounted, setIsMounted] = React.useState(false);
+
+  const openAndMark = async () => {
+    if (bookmarkId) {
+      try {
+        await incrementViewCount(bookmarkId);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -78,12 +94,7 @@ export const LinkPreview = ({
       {isMounted ? (
         <div className="hidden">
           {/* eslint-disable-next-line */}
-          <img
-            src={src}
-            width={width}
-            height={height}
-            alt="hidden image"
-          />
+          <img src={src} width={width} height={height} alt="hidden image" />
         </div>
       ) : null}
 
@@ -94,12 +105,17 @@ export const LinkPreview = ({
           setOpen(open);
         }}
       >
-        <HoverCardPrimitive.Trigger
-          onMouseMove={handleMouseMove}
-          className={cn("text-black dark:text-white", className)}
+        <HoverCardPrimitive.Trigger asChild onMouseMove={handleMouseMove}>
+          <a
           href={url}
+          onClick={(e) => {
+            e.preventDefault();
+            openAndMark();
+          }}
+          className={cn("text-xs font-medium text-primary hover:underline block truncate cursor-pointer", className)}
         >
           {children}
+        </a>
         </HoverCardPrimitive.Trigger>
 
         <HoverCardPrimitive.Content
@@ -130,6 +146,8 @@ export const LinkPreview = ({
               >
                 <a
                   href={url}
+                  target="_blank"
+                  onClick={onClick}
                   className="block p-1 bg-white border-2 border-transparent shadow rounded-xl hover:border-neutral-200 dark:hover:border-neutral-800"
                   style={{ fontSize: 0 }}
                 >

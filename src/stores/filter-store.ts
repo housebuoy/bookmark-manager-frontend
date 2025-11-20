@@ -5,10 +5,14 @@ interface FilterState {
   selectedTags: string[];
   toggleTag: (tag: string) => void;
   clearTags: () => void;
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
   selectedTags: [],
+  searchTerm: "",
+  setSearchTerm: (value) => set({ searchTerm: value }),
   toggleTag: (tag) =>
     set((state) => ({
       selectedTags: state.selectedTags.includes(tag)
