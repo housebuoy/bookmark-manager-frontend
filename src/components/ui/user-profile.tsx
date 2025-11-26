@@ -1,11 +1,7 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,26 +10,35 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useTheme } from "next-themes"
-import { Moon, Sun, LogOut, Settings, User } from "lucide-react"
+} from "@/components/ui/dropdown-menu";
+import { useTheme } from "next-themes";
+import { Moon, Sun, User } from "lucide-react";
+import { LogoutButton } from "./logout-dialog";
+import Link from "next/link";
 
-export function ProfileMenu() {
-  const { theme, setTheme } = useTheme()
-  const [isDark, setIsDark] = useState(theme === "dark")
+type User = {
+  name?: string;
+  image?: string;
+};
+
+export function ProfileMenu({ user }: { user: User }) {
+  const { theme, setTheme } = useTheme();
+  const [isDark, setIsDark] = useState(theme === "dark");
 
   const handleThemeToggle = () => {
-    const newTheme = isDark ? "light" : "dark"
-    setTheme(newTheme)
-    setIsDark(!isDark)
-  }
+    const newTheme = isDark ? "light" : "dark";
+    setTheme(newTheme);
+    setIsDark(!isDark);
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="rounded-sm ml-4 h-10 w-10 cursor-pointer">
-          <AvatarImage src="https://github.com/shadcn.png" alt="@user" />
-          <AvatarFallback>U</AvatarFallback>
+          <AvatarImage src={user.image} alt="@user" />
+          <AvatarFallback>
+            {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+          </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
 
@@ -44,14 +49,16 @@ export function ProfileMenu() {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
+          <Link href="/profile">
+            <DropdownMenuItem>
+              <User className="mr-2 h-4 w-4" />
+              <span>Profile</span>
+            </DropdownMenuItem>
+          </Link>
+          {/* <DropdownMenuItem>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
-          </DropdownMenuItem>
+          </DropdownMenuItem> */}
           <DropdownMenuItem onClick={handleThemeToggle}>
             {isDark ? (
               <>
@@ -69,11 +76,8 @@ export function ProfileMenu() {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem className="text-red-600 focus:text-red-600">
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
-        </DropdownMenuItem>
+        <LogoutButton />
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

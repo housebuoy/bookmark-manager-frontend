@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FaGoogle } from "react-icons/fa";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import Link from "next/link";
+import { toast } from "sonner";
+import { FaEnvelope } from "react-icons/fa6";
+import { authClient } from "@/lib/auth-client";
+import type { Account } from "better-auth";
+import { useSession } from "@/context/session-context";
 
 type User = {
   id?: string;
@@ -26,19 +32,47 @@ type User = {
   email?: string;
   image?: string;
   createdAt?: Date;
+  emailVerified?: boolean;
+  providerId?: string;
 };
 
-export default function ProfileClient({ user }: { user?: User }) {
+const providers = [
+  { id: "google", label: "Google", icon: FaGoogle, color: "text-red-500" },
+  {
+    id: "credential",
+    label: "Email",
+    icon: FaEnvelope,
+    color: "text-blue-500",
+  },
+];
+
+export default function ProfileClient() {
+  type User = {
+    name?: string;
+    image?: string;
+    email?: string;
+    createdAt?: Date;
+    emailVerified?: boolean;
+    providerId?: string;
+  };
+
+  const { session } = useSession();
+  console.log("Session in ProfileClient:", session);
+  const user : User = {
+    ...session?.user,
+    image: session?.user?.image ?? undefined,
+  };
   const { theme, setTheme } = useTheme();
   const [userName, setUserName] = useState(user?.name || "");
   const [userEmail, setUserEmail] = useState(user?.email || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
   const [open, setOpen] = useState(false);
 
-const bookmarks = useBookmarkStore((state) => state.bookmarks);
-const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
+  const bookmarks = useBookmarkStore((state) => state.bookmarks);
+  const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -49,6 +83,16 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
     };
     fetch();
   }, [loadBookmarks]);
+
+  const [accounts, setAccounts] = useState<Partial<Account>[]>([]);
+
+  useEffect(() => {
+    const loadAccounts = async () => {
+      const { data } = await authClient.listAccounts();
+      setAccounts(data ?? []);
+    };
+    loadAccounts();
+  }, []);
 
   const tagsWithCount = useMemo(() => {
     const tagCount: Record<string, number> = {};
@@ -83,7 +127,6 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
 
   if (isLoading) return <p>Loading stats...</p>;
 
-
   const dummyPasskeys = [
     { id: "1", name: "MacBook Pro TouchID", icon: "laptop_mac" },
     { id: "2", name: "iPhone FaceID", icon: "smartphone" },
@@ -112,13 +155,48 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
   const handleSaveEmail = () => alert("Email updated (dummy)");
   const handleResendVerification = () =>
     alert("Verification email sent (dummy)");
-  const handleUpdatePassword = () => {
-    if (newPassword !== confirmNewPassword)
-      return alert("Passwords do not match!");
-    alert("Password changed (dummy)");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmNewPassword("");
+
+  const handleUpdatePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return toast.error("All fields are required");
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return toast.error("New passwords do not match");
+    }
+
+    try {
+      setIsPasswordUpdating(true);
+      const res = await fetch("/api/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          revokeOtherSessions: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return toast.error(data?.message || "Failed to update password");
+      }
+
+      toast.success("Password updated successfully!");
+
+      // Optional: clear fields
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (err) {
+      toast.error("Something went wrong");
+      console.log("Error updating password:", err);
+    } finally {
+      setIsPasswordUpdating(false);
+    }
   };
 
   return (
@@ -160,29 +238,28 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
         </div>
 
         {/* Stats */}
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-  <StatCard
-    title="Total Bookmarks"
-    value={totalBookmarks.toString()}
-    color="text-blue-600"
-  />
-  <StatCard
-    title="Total Tags"
-    value={totalTags.toString()}
-    color="text-green-600"
-  />
-  <StatCard
-    title="Most Active Tag"
-    value={mostActiveTag}
-    color="text-purple-600"
-  />
-  <StatCard
-    title="Last Bookmark Added"
-    value={lastBookmarkAdded}
-    color="text-yellow-600"
-  />
-</div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <StatCard
+            title="Total Bookmarks"
+            value={totalBookmarks.toString()}
+            color="text-blue-600"
+          />
+          <StatCard
+            title="Total Tags"
+            value={totalTags.toString()}
+            color="text-green-600"
+          />
+          <StatCard
+            title="Most Active Tag"
+            value={mostActiveTag}
+            color="text-purple-600"
+          />
+          <StatCard
+            title="Last Bookmark Added"
+            value={lastBookmarkAdded}
+            color="text-yellow-600"
+          />
+        </div>
 
         {/* Theme Toggle */}
         <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 mb-4 border border-gray-200 dark:border-gray-700">
@@ -267,20 +344,22 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
         </div>
 
         {/* Email Verification */}
-        <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 mb-4 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold mb-4">Email Verification</h2>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-yellow-50 dark:bg-yellow-900 rounded-md">
-            <p className="text-yellow-800 dark:text-yellow-200">
-              ⚠️ Email address not verified
-            </p>
-            <button
-              onClick={handleResendVerification}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
-            >
-              Resend Verification Email
-            </button>
+        {!user?.emailVerified && (
+          <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 mb-4 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold mb-4">Email Verification</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-yellow-50 dark:bg-yellow-900 rounded-md">
+              <p className="text-yellow-800 dark:text-yellow-200">
+                ⚠️ Email address not verified
+              </p>
+              <button
+                onClick={handleResendVerification}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+              >
+                Resend Verification Email
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Security */}
         <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 mb-4 border border-gray-200 dark:border-gray-700">
@@ -299,6 +378,12 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
+              <div className="w-full flex justify-end">
+                <Link href="#" className="text-sm text-right underline">
+                  Forgot password?
+                </Link>
+              </div>
+
               <input
                 type="password"
                 placeholder="New Password"
@@ -313,11 +398,17 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
                 className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
+
               <button
                 onClick={handleUpdatePassword}
-                className="px-4 py-2 bg-primary text-white rounded-md w-full"
+                className="px-4 py-2 bg-[#054744] cursor-pointer text-white rounded-md w-full"
+                disabled={isPasswordUpdating}
               >
-                Update Password
+                {isPasswordUpdating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Update Password"
+                )}
               </button>
             </div>
           </div>
@@ -344,13 +435,36 @@ const loadBookmarks = useBookmarkStore((state) => state.loadBookmarks);
           {/* Connected Accounts */}
           <div>
             <h3 className="font-semibold mb-2">Connected Accounts</h3>
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
-              <div className="flex items-center gap-2">
-                <FaGoogle className="text-red-500 w-5 h-5" />
-                <span>Google</span>
-              </div>
-              <span className="text-green-500 font-semibold">Connected</span>
-            </div>
+
+            {providers.map((provider) => {
+              const Icon = provider.icon;
+
+              const isConnected = accounts.some(
+                (acc) => acc.providerId === provider.id
+              );
+
+              return (
+                <div
+                  key={provider.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-md mb-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className={`${provider.color} w-5 h-5`} />
+                    <span>{provider.label}</span>
+                  </div>
+
+                  {isConnected ? (
+                    <span className="text-green-500 font-semibold">
+                      Connected
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 font-semibold">
+                      Not Connected
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

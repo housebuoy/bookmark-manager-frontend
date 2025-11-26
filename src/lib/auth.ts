@@ -1,38 +1,42 @@
-import {
-    betterAuth
-} from 'better-auth';
-// import { Pool } from "pg";np
+// auth.ts
+import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { PrismaClient } from '../generated/prisma/client';
-import { passkey } from "better-auth/plugins/passkey"
+import { prisma } from "./prisma"
+import { passkey } from "better-auth/plugins/passkey";
 import { nextCookies } from "better-auth/next-js";
+import { sendEmail } from "@/lib/brevo"; // Brevo email sending function
 
+// const prisma = new PrismaClient();
 
-const prisma = new PrismaClient();
 export const auth = betterAuth({
-    database: prismaAdapter(prisma, {provider: "postgresql"} ),
-    emailAndPassword: {
-        enabled: true,
-        // async sendResetPassword(data, request) {
-        //     // Send an email to the user with a link to reset their password
-        // },
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    signUp: {
+      autoSignIn: false,
     },
-    socialProviders: {
-        google: {
-            clientId: process.env.GOOGLE_CLIENT_ID!,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET!
-        }
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        templateId: 1, // Brevo template ID
+        params: {
+          VERIFICATION_URL: url,
+          USERNAME: user.name || "User",
+        },
+      });
     },
-    plugins: [
-        nextCookies(),
-        passkey(),
+  },
 
-    ],
-    debug: true,
-    /** if no database is provided, the user data will be stored in memory.
-     * Make sure to provide a database to persist user data **/
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+  plugins: [nextCookies(), passkey()],
+  debug: true,
 });
-
-// function passkey(): any {
-//     throw new Error('Function not implemented.');
-// }

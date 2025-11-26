@@ -9,6 +9,7 @@ import { Loader2, Key } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -17,25 +18,44 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
 
   const handleEmailSignIn = async () => {
-    setLoading(true);
-    try {
-      await signIn.email(
-        {
-          email,
-          password,
-          callbackURL: "/",
-          rememberMe,
+  setLoading(true);
+
+  try {
+    await signIn.email(
+      {
+        email,
+        password,
+        callbackURL: "/",
+        rememberMe,
+      },
+      {
+        onRequest: () => setLoading(true),
+
+        onError: (ctx) => {
+          setLoading(false);
+
+          if (ctx.error.status === 403) {
+            toast.error("Your email is not verified. Check your inbox or resend the link.");
+            return;
+          }
+
+          toast.error(ctx.error.message || "Something went wrong.");
         },
-        {
-          onRequest: () => setLoading(true),
-          onResponse: () => setLoading(false),
-        }
-      );
-    } catch (err) {
-      console.error("Sign-in error:", err);
-      setLoading(false);
-    }
-  };
+
+        onSuccess: () => {
+          setLoading(false);
+          toast.success("Signed in successfully!");
+        },
+
+        onResponse: () => setLoading(false),
+      }
+    );
+  } catch (err) {
+    console.error("Sign-in error:", err);
+    setLoading(false);
+    toast.error("Unexpected error occurred. Try again.");
+  }
+};
 
   return (
     <Card className="w-full min-h-screen px-10 sm:flex justify-center md:px-10 sm:px-5">
