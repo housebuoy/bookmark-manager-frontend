@@ -13,21 +13,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { FaPlus } from "react-icons/fa6";
+import { FaPlus, FaWandMagicSparkles } from "react-icons/fa6"; // Added Magic Icon
+import { Loader2 } from "lucide-react"; // Added Loader
 import { toast } from "sonner";
 import TagInput from "./tag-input";
 import { authClient } from "@/lib/auth-client";
 
 interface AddBookmarkButtonProps {
-  showText?: boolean; // optional prop, default to true
+  showText?: boolean;
 }
-
-const session = await authClient.getSession();
-const userId = session.data?.user?.id;
 
 export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
   const addBookmark = useBookmarkStore((state) => state.addBookmark);
   const [open, setOpen] = useState(false);
+  const [isScraping, setIsScraping] = useState(false); // Loading state
   const [form, setForm] = useState({
     title: "",
     url: "",
@@ -41,15 +40,77 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // ✨ New Function: Handle Auto-Fill
+  const handleAutoFill = async () => {
+    let urlToScrape = form.url.trim();
+
+    if (!urlToScrape) {
+      toast.error("Please enter a URL first");
+      return;
+    }
+
+    if (
+      !urlToScrape.startsWith("http://") &&
+      !urlToScrape.startsWith("https://")
+    ) {
+      urlToScrape = "https://" + urlToScrape;
+      // Update form state so the user sees the change
+      setForm((prev) => ({ ...prev, url: urlToScrape }));
+    }
+
+    setIsScraping(true);
+    try {
+      const session = await authClient.getSession();
+      const userId = session.data?.user?.id;
+
+      if (!userId) {
+        toast.error("You must be logged in.");
+        return;
+      }
+
+      const response = await fetch(
+        "http://localhost:8080/api/scraper/preview",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({ url: form.url }),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to scrape site");
+
+      const data = await response.json();
+
+      setForm((prev) => ({
+        ...prev,
+        title: data.title || prev.title,
+        description: data.description || prev.description,
+        // Join the list of matched tags into a string for the TagInput
+        tags: data.tags ? data.tags.join(",") : prev.tags,
+      }));
+
+      toast.success("Details auto-filled!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not fetch site details.");
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const session = await authClient.getSession();
+    const userId = session.data?.user?.id;
 
     if (!userId) {
       toast.error("User ID not found. Please log in again.");
       return;
     }
 
-    // Prepare payload without id, lastVisited, or dateAdded
     const payload = {
       title: form.title,
       url: form.url,
@@ -58,7 +119,10 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
       isPinned: false,
       isArchived: false,
       viewCount: 0,
-      tags: form.tags.split(",").map((tag) => tag.trim()),
+      tags: form.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
     };
 
     try {
@@ -72,15 +136,14 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
       });
 
       if (!response.ok) {
-        // Show full error
         const errorText = await response.text();
         console.error("Failed to save bookmark", errorText);
+        toast.error("Failed to save bookmark.");
         return;
       }
 
       const savedBookmark = await response.json();
 
-      // Add the new bookmark to Zustand store
       addBookmark({
         ...savedBookmark,
         lastVisited: savedBookmark.lastVisited ?? null,
@@ -124,26 +187,41 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">
+            <Label htmlFor="url">URL</Label>
+            <div className="flex gap-2">
+              <Input
+                id="url"
+                name="url"
+                type="url"
+                value={form.url}
+                onChange={handleChange}
+                placeholder="https://example.com"
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAutoFill}
+                disabled={isScraping || !form.url}
+                title="Auto-fill details from URL"
+              >
+                {isScraping ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FaWandMagicSparkles className="h-4 w-4 text-indigo-600" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
             <Label htmlFor="title">Title</Label>
             <Input
               id="title"
               name="title"
               value={form.title}
               onChange={handleChange}
-              placeholder="Enter website title"
-              required
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="url">URL</Label>
-            <Input
-              id="url"
-              name="url"
-              type="url"
-              value={form.url}
-              onChange={handleChange}
-              placeholder="https://example.com"
+              placeholder="Website Title"
               required
             />
           </div>
@@ -168,6 +246,7 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
               {form.description.length}/200 characters
             </p>
           </div>
+
           <div className="grid gap-2">
             <Label htmlFor="tags">Tags</Label>
             <TagInput
