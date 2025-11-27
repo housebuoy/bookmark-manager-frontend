@@ -12,7 +12,7 @@ type User = {
 const Header = ({ user }: { user: User }) => {
   return (
     <>
-      <header className="w-full dark:bg-[var(--sidebar)] h-16 text-black dark:text-white flex items-center justify-between px-4 shadow-sm sticky top-0 bg-white z-50">
+      <header className="w-full dark:bg-[var(--sidebar)] h-16 py-5 text-black dark:text-white flex items-center justify-between px-4 shadow-sm sticky top-0 bg-white z-50">
         <section className="flex items-center gap-4">
           <SidebarTrigger className="text-black dark:text-white" />
           <SearchBar />

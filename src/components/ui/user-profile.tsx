@@ -55,10 +55,6 @@ export function ProfileMenu({ user }: { user: User }) {
               <span>Profile</span>
             </DropdownMenuItem>
           </Link>
-          {/* <DropdownMenuItem>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </DropdownMenuItem> */}
           <DropdownMenuItem onClick={handleThemeToggle}>
             {isDark ? (
               <>

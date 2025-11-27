@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import { useBookmarkStore } from "@/stores/bookmark-store";
 import {
@@ -17,10 +16,14 @@ import { Label } from "@/components/ui/label";
 import { FaPlus } from "react-icons/fa6";
 import { toast } from "sonner";
 import TagInput from "./tag-input";
+import { authClient } from "@/lib/auth-client";
 
 interface AddBookmarkButtonProps {
   showText?: boolean; // optional prop, default to true
 }
+
+const session = await authClient.getSession();
+const userId = session.data?.user?.id;
 
 export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
   const addBookmark = useBookmarkStore((state) => state.addBookmark);
@@ -41,6 +44,11 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!userId) {
+      toast.error("User ID not found. Please log in again.");
+      return;
+    }
+
     // Prepare payload without id, lastVisited, or dateAdded
     const payload = {
       title: form.title,
@@ -56,7 +64,10 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
     try {
       const response = await fetch("http://localhost:8080/api/bookmarks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Id": userId,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -76,10 +87,12 @@ export function AddBookmarkModal({ showText = true }: AddBookmarkButtonProps) {
         dateAdded: savedBookmark.dateAdded ?? null,
       });
 
+      toast.success("Bookmark saved successfully!");
       setForm({ title: "", url: "", description: "", tags: "" });
       setOpen(false);
     } catch (err) {
       console.error("Error saving bookmark:", err);
+      toast.error("An unexpected error occurred.");
     }
   };
 

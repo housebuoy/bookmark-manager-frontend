@@ -32,12 +32,14 @@ export default async function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <SessionProvider initialSession={session}>
-      <div className="flex w-full min-h-screen">
+      <div className="flex w-full h-screen overflow-hidden">
         <AppSidebar />
-        <main className="flex-1 flex flex-col overflow-hidden w-full">
+        <div className="flex-1 flex flex-col w-full overflow-y-auto">
           <Header user={user} />
-          {children}
-        </main>
+          <main className="flex-1 flex flex-col w-full">
+            {children}
+          </main>
+        </div>
       </div>
     </SessionProvider>
   );

@@ -84,7 +84,7 @@ export default function SignIn() {
           <div className="grid gap-2">
             <div className="flex justify-between items-center">
               <Label>Password</Label>
-              <Link href="#" className="text-sm underline">
+              <Link href="/forgot-password" className="text-sm underline">
                 Forgot password?
               </Link>
             </div>

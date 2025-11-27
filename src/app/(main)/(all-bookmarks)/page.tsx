@@ -51,7 +51,7 @@ export default function Home() {
             variant="ghost"
             aria-label="Toggle layout"
             onClick={() => setIsGrid(!isGrid)}
-            className="gap-1 cursor-pointer bg-accent text-accent-foreground hover:bg-accent/30 flex items-center"
+            className="gap-1 hidden sm:flex cursor-pointer bg-accent text-accent-foreground hover:bg-accent/30 items-center"
           >
             {isGrid ? <List className="h-5 w-5" /> : <Grid className="h-5 w-5" />}
             {isGrid ? <p>List</p> : <p>Grid</p>}

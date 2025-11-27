@@ -1,7 +1,7 @@
 // auth.ts
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { prisma } from "./prisma"
+import { prisma } from "./prisma";
 import { passkey } from "better-auth/plugins/passkey";
 import { nextCookies } from "better-auth/next-js";
 import { sendEmail } from "@/lib/brevo"; // Brevo email sending function
@@ -15,6 +15,20 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     signUp: {
       autoSignIn: false,
+    },
+    sendResetPassword: async ({ user, url, token }, request) => {
+      await sendEmail({
+        to: user.email,
+        templateId: 2, // Brevo template ID
+        params: {
+          RESET_PASSWORD_URL: url,
+          USERNAME: user.name || "User",
+        },
+      });
+    },
+    onPasswordReset: async ({ user }, request) => {
+      // your logic here
+      console.log(`Password for user ${user.email} has been reset.`);
     },
   },
   emailVerification: {
@@ -30,7 +44,11 @@ export const auth = betterAuth({
       });
     },
   },
-
+  user: {
+    deleteUser: {
+      enabled: true,
+    },
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,

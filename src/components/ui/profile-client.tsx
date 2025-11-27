@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FaGoogle } from "react-icons/fa";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Pen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,16 +25,9 @@ import { FaEnvelope } from "react-icons/fa6";
 import { authClient } from "@/lib/auth-client";
 import type { Account } from "better-auth";
 import { useSession } from "@/context/session-context";
-
-type User = {
-  id?: string;
-  name?: string;
-  email?: string;
-  image?: string;
-  createdAt?: Date;
-  emailVerified?: boolean;
-  providerId?: string;
-};
+import { Skeleton } from "@/components/ui/skeleton";
+import { SignOutButton } from "./sign-out-button";
+import { DeleteAccountButton } from "./delete-button";
 
 const providers = [
   { id: "google", label: "Google", icon: FaGoogle, color: "text-red-500" },
@@ -57,11 +50,40 @@ export default function ProfileClient() {
   };
 
   const { session } = useSession();
-  console.log("Session in ProfileClient:", session);
-  const user : User = {
-    ...session?.user,
-    image: session?.user?.image ?? undefined,
-  };
+  const user: User = useMemo(() => {
+    if (!session) return {} as User;
+
+    if (
+      typeof session === "object" &&
+      "user" in session &&
+      (session as Record<string, unknown>).user
+    ) {
+      const u = (session as Record<string, unknown>).user as Record<
+        string,
+        unknown
+      >;
+      return {
+        name: u.name as string | undefined,
+        email: u.email as string | undefined,
+        image: (u.image ?? undefined) as string | undefined,
+        createdAt: u.createdAt as Date | undefined,
+        emailVerified: u.emailVerified as boolean | undefined,
+        providerId: u.providerId as string | undefined,
+      } as User;
+    }
+
+    // Otherwise assume session itself might already represent the user shape.
+    const s = session as Record<string, unknown>;
+    return {
+      name: s.name as string | undefined,
+      email: s.email as string | undefined,
+      image: (s.image ?? undefined) as string | undefined,
+      createdAt: s.createdAt as Date | undefined,
+      emailVerified: s.emailVerified as boolean | undefined,
+      providerId: s.providerId as string | undefined,
+    } as User;
+  }, [session]);
+
   const { theme, setTheme } = useTheme();
   const [userName, setUserName] = useState(user?.name || "");
   const [userEmail, setUserEmail] = useState(user?.email || "");
@@ -125,7 +147,32 @@ export default function ProfileClient() {
           new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
       )[0]?.title || "N/A";
 
-  if (isLoading) return <p>Loading stats...</p>;
+  if (isLoading) {
+    return (
+      <div className="w-full mx-auto p-4 sm:p-10">
+        <h1 className="text-2xl font-semibold mb-4 ml-4">Profile</h1>
+        {/* 1. Identity Card Skeleton (Optional, but good practice) */}
+        <div className="bg-white dark:bg-[#161616] rounded-xl shadow-lg p-4 sm:p-8 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-6 border border-gray-200 dark:border-gray-700 mb-4 w-full">
+          <Skeleton className="rounded-full w-20 h-20 shrink-0" />
+          <div className="flex flex-col justify-center gap-2 w-full sm:w-1/3">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        </div>
+
+        {/* 2. Stats Grid Skeleton (The primary target) */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+
+        {/* You can add skeletons for other sections like Theme Toggle, Settings, etc., here */}
+      </div>
+    );
+  }
 
   const dummyPasskeys = [
     { id: "1", name: "MacBook Pro TouchID", icon: "laptop_mac" },
@@ -151,7 +198,24 @@ export default function ProfileClient() {
     themeOptions.find((option) => option.value === theme)?.label ||
     "Select theme...";
 
-  const handleSaveName = () => alert("Name updated (dummy)");
+  const handleSaveName = async () => {
+    try {
+      const { error } = await authClient.updateUser({
+        name: userName, // ✅ use input value
+      });
+
+      if (error) {
+        toast.error("Could not save name");
+        return;
+      }
+
+      toast.success("Name updated!");
+      //eslint-disable-next-line
+    } catch (err) {
+      toast.error("Something went wrong");
+    }
+  };
+
   const handleSaveEmail = () => alert("Email updated (dummy)");
   const handleResendVerification = () =>
     alert("Verification email sent (dummy)");
@@ -205,20 +269,64 @@ export default function ProfileClient() {
         <h1 className="text-2xl font-semibold mb-4">Profile</h1>
 
         {/* Identity Card */}
-        <div className="bg-white dark:bg-[#161616] rounded-xl shadow-lg p-8 flex items-center gap-6 border border-gray-200 dark:border-gray-700 mb-4">
-          <Avatar className="rounded-full ring-4 ring-[#054744] dark:ring-[#054744]/50 w-20 h-20">
-            <AvatarImage src={user?.image} alt="@evilrabbit" />
-            <AvatarFallback>
-              {userName?.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+        <div
+          className="bg-white dark:bg-[#161616] rounded-xl shadow-lg p-4 sm:p-8 
+          flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-6 
+          border border-gray-200 dark:border-gray-700 mb-4
+          w-full"
+        >
+          <div className="relative group">
+            <Avatar className="rounded-full ring-4 ring-[#054744] dark:ring-[#054744]/50 w-20 h-20">
+              <AvatarImage src={user?.image} alt="User avatar" />
+              <AvatarFallback>
+                {userName?.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
 
-          <div className="flex flex-col justify-center">
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {/* Hover Edit Overlay */}
+            <label
+              htmlFor="avatarUpload"
+              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition cursor-pointer"
+            >
+              <Pen className="text-white w-4 h-4" />
+            </label>
+
+            {/* Hidden File Input */}
+            <input
+              id="avatarUpload"
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                try {
+                  const reader = new FileReader();
+                  reader.readAsDataURL(file);
+                  reader.onload = async () => {
+                    const base64 = reader.result as string;
+
+                    await authClient.updateUser({ image: base64 });
+                    setUserName(userName); // keep name same to prevent full rerender
+                    toast.success("Profile picture updated!");
+                  };
+                } catch {
+                  toast.error("Failed to update profile picture.");
+                }
+              }}
+              className="hidden"
+            />
+          </div>
+
+          <div className="flex flex-col justify-center text-center sm:text-left min-w-0">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white truncate">
               {userName}
             </p>
 
-            <p className="text-lg text-indigo-600 dark:text-indigo-400 mb-1">
+            <p
+              className="text-lg text-indigo-600 dark:text-indigo-400 mb-1 
+              break-words min-w-0"
+            >
               {userEmail}
             </p>
 
@@ -238,7 +346,7 @@ export default function ProfileClient() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <StatCard
             title="Total Bookmarks"
             value={totalBookmarks.toString()}
@@ -321,7 +429,7 @@ export default function ProfileClient() {
               />
               <button
                 onClick={handleSaveName}
-                className="px-4 py-2 bg-primary text-white rounded-md"
+                className="px-4 py-2 bg-[#054744] text-white rounded-md"
               >
                 Save
               </button>
@@ -335,7 +443,7 @@ export default function ProfileClient() {
               />
               <button
                 onClick={handleSaveEmail}
-                className="px-4 py-2 bg-primary text-white rounded-md"
+                className="px-4 py-2 bg-[#054744] text-white rounded-md"
               >
                 Save
               </button>
@@ -414,7 +522,7 @@ export default function ProfileClient() {
           </div>
 
           {/* Passkeys */}
-          <div className="mb-4">
+          {/* <div className="mb-4">
             <h3 className="font-semibold mb-2">Passkeys & Devices</h3>
             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
               {dummyPasskeys.map((pk) => (
@@ -430,7 +538,7 @@ export default function ProfileClient() {
             <button className="mt-3 px-4 py-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary rounded-md flex items-center gap-2">
               + Add New Passkey
             </button>
-          </div>
+          </div> */}
 
           {/* Connected Accounts */}
           <div>
@@ -446,7 +554,7 @@ export default function ProfileClient() {
               return (
                 <div
                   key={provider.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-md mb-2"
+                  className="flex items-center justify-between px-2 py-2 bg-gray-50 dark:bg-gray-900 rounded-md "
                 >
                   <div className="flex items-center gap-2">
                     <Icon className={`${provider.color} w-5 h-5`} />
@@ -479,12 +587,8 @@ export default function ProfileClient() {
             </p>
           </div>
           <div className="flex gap-3">
-            <button className="px-4 py-2 border rounded-md hover:bg-gray-200 dark:hover:bg-gray-700">
-              Sign Out
-            </button>
-            <button className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
-              Delete Account
-            </button>
+            <SignOutButton />
+            <DeleteAccountButton />
           </div>
         </div>
       </div>
@@ -502,8 +606,18 @@ const StatCard = ({
   value: string;
   color: string;
 }) => (
-  <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700 text-center">
+  <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 border flex flex-col items-center justify-center border-gray-200 dark:border-gray-700 text-center">
     <p className={`text-2xl font-bold ${color}`}>{value}</p>
     <p className="text-gray-500 dark:text-gray-400">{title}</p>
+  </div>
+);
+
+const StatCardSkeleton = () => (
+  <div className="bg-white dark:bg-[#161616] rounded-xl shadow p-6 border flex flex-col items-center justify-center border-gray-200 dark:border-gray-700 text-center">
+    {/* Skeleton for the Value (larger text) */}
+    <Skeleton className="h-7 w-1/2 mb-2" />
+
+    {/* Skeleton for the Title (smaller text) */}
+    <Skeleton className="h-5 w-3/4" />
   </div>
 );

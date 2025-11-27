@@ -2,6 +2,7 @@
 import axios from "axios";
 import { toast } from "sonner";
 import { create } from "zustand";
+import { authClient } from "@/lib/auth-client";
 
 export interface Tag {
   id: number | string;
@@ -21,8 +22,9 @@ export interface Bookmark {
   viewCount: number;
   lastVisited: string;
   dateAdded: string;
+  // Optional properties for mapping consistency
   pinned?: boolean;
-  archived: boolean;
+  archived?: boolean;
 }
 
 export type SortOption = "recently_added" | "recently_visited" | "most_visited";
@@ -34,12 +36,12 @@ interface BookmarkStore {
   addBookmark: (bookmark: Bookmark) => void;
   loadBookmarks: () => Promise<void>;
   updateBookmark: (id: string, updated: Partial<Bookmark>) => void;
-  deleteBookmark: (id: string) => void;
-  togglePin: (id: string) => void;
-  toggleArchive: (id: string) => void;
+  deleteBookmark: (id: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
+  toggleArchive: (id: string) => Promise<void>;
   showArchived: boolean;
   setShowArchived: (value: boolean) => void;
-  incrementViewCount: (id: string) => void;
+  incrementViewCount: (id: string) => Promise<void>;
   setSortBy: (option: SortOption) => void;
   sortedBookmarks: () => Bookmark[];
   toggleTag: (tag: string) => void;
@@ -51,7 +53,23 @@ interface BookmarkStore {
   searchQuery?: string;
   setSearchQuery: (value: string) => void;
 }
+
 const MAX_PINNED = 5;
+
+// Helper to get headers with User ID
+const getAuthHeaders = async () => {
+  const session = await authClient.getSession();
+  const userId = session.data?.user?.id;
+
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
+
+  return {
+    "Content-Type": "application/json",
+    "X-User-Id": userId,
+  };
+};
 
 export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
   bookmarks: [],
@@ -64,6 +82,7 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
   searchQuery: "",
   setSearchQuery: (value) => set({ searchQuery: value }),
 
+  // Sync state update (API call handled in component)
   addBookmark: (bookmark) =>
     set((state): Partial<BookmarkStore> => {
       const exists = state.bookmarks.some(
@@ -72,12 +91,13 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
       if (exists) {
         toast.error("A bookmark with this link already exists.");
-        return {}; // Return empty object instead of void
+        return {};
       }
 
       return { bookmarks: [...state.bookmarks, bookmark] };
     }),
 
+  // Sync state update (API call handled in component)
   updateBookmark: (id, updated) =>
     set((state): Partial<BookmarkStore> => {
       const updatedUrl = updated.url?.trim().toLowerCase();
@@ -89,7 +109,7 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
         )
       ) {
         toast.error("A bookmark with this link already exists.");
-        return {}; // ✅ void = skip update
+        return {};
       }
 
       return {
@@ -101,13 +121,18 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
   deleteBookmark: async (id: string) => {
     try {
-      await axios.delete(`http://localhost:8080/api/bookmarks/${id}`);
-      // Remove from local state
+      const headers = await getAuthHeaders();
+      await axios.delete(`http://localhost:8080/api/bookmarks/${id}`, {
+        headers,
+      });
+      
       set((state) => ({
         bookmarks: state.bookmarks.filter((b) => b.id !== id),
       }));
+      toast.success("Bookmark deleted");
     } catch (err) {
       console.error("Failed to delete bookmark:", err);
+      toast.error("Failed to delete bookmark");
     }
   },
 
@@ -116,7 +141,6 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     const bookmark = bookmarks.find((b) => b.id === id);
     if (!bookmark) return;
 
-    // 🚫 Prevent pinning more than limit
     if (!bookmark.isPinned) {
       const pinnedCount = bookmarks.filter((b) => b.isPinned).length;
       if (pinnedCount >= MAX_PINNED) {
@@ -126,8 +150,12 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     }
 
     try {
+      const headers = await getAuthHeaders();
+      // NOTE: Empty body {} is required for axios.patch to recognize the 3rd arg as config
       const { data: updated } = await axios.patch(
-        `http://localhost:8080/api/bookmarks/${id}/pin`
+        `http://localhost:8080/api/bookmarks/${id}/pin`,
+        {}, 
+        { headers }
       );
 
       set({
@@ -135,11 +163,12 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       });
     } catch (err) {
       console.error("Failed to toggle pin:", err);
+      toast.error("Failed to toggle pin");
     }
   },
 
   incrementViewCount: async (id: string) => {
-    // optimistic update: increment local immediately
+    // optimistic update
     set((state) => ({
       bookmarks: state.bookmarks.map((b) =>
         b.id === id
@@ -153,17 +182,18 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     }));
 
     try {
+      const headers = await getAuthHeaders();
       const { data: updated } = await axios.patch<Bookmark>(
-        `http://localhost:8080/api/bookmarks/${id}/view`
+        `http://localhost:8080/api/bookmarks/${id}/view`,
+        {},
+        { headers }
       );
-      // sync with backend response (in case server has canonical time)
+      
       set((state) => ({
         bookmarks: state.bookmarks.map((b) => (b.id === id ? updated : b)),
       }));
     } catch (err) {
       console.error("Failed to increment view count:", err);
-      // optional: roll back optimistic increment on failure
-      // set((state) => ({ bookmarks: state.bookmarks.map(b => b.id === id ? { ...b, viewCount: Math.max(0, b.viewCount - 1) } : b) }));
     }
   },
 
@@ -189,7 +219,6 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     }
   },
 
-  // 🧩 Filtering logic
   toggleTag: (tag) =>
     set((state) => ({
       selectedTags: state.selectedTags.includes(tag)
@@ -207,7 +236,6 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
       });
     });
 
-    // return unique tags with counts
     return Object.entries(tagCount).map(([name, count], index) => ({
       id: `${index}`,
       name,
@@ -220,11 +248,13 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
     if (!bookmark) return;
 
     try {
+      const headers = await getAuthHeaders();
       const { data: updated } = await axios.patch<Bookmark>(
-        `http://localhost:8080/api/bookmarks/${id}/archive`
+        `http://localhost:8080/api/bookmarks/${id}/archive`,
+        {},
+        { headers }
       );
 
-      // Force unpin if the bookmark is now archived
       const modified = updated.isArchived
         ? { ...updated, isPinned: false }
         : updated;
@@ -239,7 +269,6 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
         toast.success("Bookmark restored");
       }
 
-      // Refresh bookmarks
       set((state) => ({
         refreshKey: state.refreshKey + 1,
       }));
@@ -273,26 +302,39 @@ export const useBookmarkStore = create<BookmarkStore>((set, get) => ({
 
   loadBookmarks: async () => {
     try {
-      const { data } = await axios.get("http://localhost:8080/api/bookmarks");
-      // map `archived` from backend to `isArchived` in frontend
-      const mapped = data.map((b: Bookmark) => ({
+      const headers = await getAuthHeaders();
+      
+      const { data } = await axios.get<Bookmark[]>(
+        "http://localhost:8080/api/bookmarks",
+        {
+          headers,
+        }
+      );
+
+      const mapped = data.map((b) => ({
         ...b,
-        isArchived: b.archived ?? false,
+        // Handle backend field mapping if needed
+        isArchived: b.isArchived ?? b.archived ?? false,
+        isPinned: b.isPinned ?? b.pinned ?? false,
       }));
+      
       set({ bookmarks: mapped });
     } catch (err) {
       console.error("Failed to fetch bookmarks:", err);
+      // Optionally set an error state here
     }
   },
+
   loadPinnedBookmarks: async () => {
     try {
+      const headers = await getAuthHeaders();
       const { data } = await axios.get<Bookmark[]>(
-        "http://localhost:8080/api/bookmarks/pinned"
+        "http://localhost:8080/api/bookmarks/pinned",
+        { headers }
       );
       set({ pinnedBookmarks: data });
     } catch (err) {
       console.error("Failed to fetch pinned bookmarks:", err);
     }
   },
-
 }));

@@ -30,6 +30,7 @@ model User {
 
   // 1. Add this line to link to bookmarks
   bookmarks     Bookmark[] 
+  tags          Tag[]
 
   @@unique([email])
   @@map("user")
@@ -114,9 +115,12 @@ model Bookmark_tags {
 model Tag {
   id            BigInt          @id @default(autoincrement())
   name          String?         @db.VarChar(255)
+  userId        String?         
+  user          User?           @relation(fields: [userId], references: [id])
   bookmark_tags Bookmark_tags[]
 
   @@map("tag")
+  @@unique([name, userId])
 }
 
 model Passkey {
