@@ -24,21 +24,29 @@ export default function Home() {
 
   const filtered = filteredBookmarks();
 
-  const sortedBookmarks = [...filtered].sort((a, b) =>
-    a.isPinned === b.isPinned ? 0 : a.isPinned ? -1 : 1
-  );
+  const finalSortedBookmarks = [...filtered].sort((a, b) => {
+    // 1. Priority: Pinned items always come first
+    if (a.isPinned !== b.isPinned) {
+      return a.isPinned ? -1 : 1;
+    }
 
-  const sorted = [...filtered].sort((a, b) => {
-  switch (sortBy) {
-    case "recently_visited":
-      return new Date(b.lastVisited).getTime() - new Date(a.lastVisited).getTime();
-    case "most_visited":
-      return b.viewCount - a.viewCount;
-    case "recently_added":
-    default:
-      return new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime();
-  }
-});
+    // 2. Secondary: Apply the selected sort criteria
+    switch (sortBy) {
+      case "recently_visited":
+        return (
+          new Date(b.lastVisited || 0).getTime() -
+          new Date(a.lastVisited || 0).getTime()
+        );
+      case "most_visited":
+        return (b.viewCount || 0) - (a.viewCount || 0);
+      case "recently_added":
+      default:
+        return (
+          new Date(b.dateAdded || 0).getTime() -
+          new Date(a.dateAdded || 0).getTime()
+        );
+    }
+  });
   
 
   return (
@@ -71,7 +79,7 @@ export default function Home() {
             </div>
           ))}
         </div>
-      ) : sortedBookmarks.length === 0 ? (
+      ) : finalSortedBookmarks.map.length === 0 ? (
         <p className="text-gray-500 p-6">No bookmarks found.</p>
       ) : (
         <div
@@ -79,7 +87,7 @@ export default function Home() {
             isGrid ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
           }`}
         >
-          {sortedBookmarks.map((b, index) => (
+          {finalSortedBookmarks.map((b, index) => (
             <BookmarkCard key={b.id ?? index} bookmark={b} />
           ))}
         </div>

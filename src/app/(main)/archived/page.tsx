@@ -6,11 +6,12 @@ import { Grid, List } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookmarkCard } from "@/components/ui/bookmark-card";
 import { useBookmarkStore } from "@/stores/bookmark-store";
+import { SortByDropdown } from "@/components/ui/sort-by-dropdown";
+import Link from "next/link";
 
 export default function ArchivedBookmarksPage() {
   const [isGrid, setIsGrid] = useState(true);
-  const { loadBookmarks, filteredBookmarks, setShowArchived } = useBookmarkStore();
-
+  const { loadBookmarks, filteredBookmarks, setShowArchived, sortBy, setSortBy } = useBookmarkStore();
   // Local loading state
   const [loading, setLoading] = useState(true);
 
@@ -31,11 +32,36 @@ export default function ArchivedBookmarksPage() {
 
   const filtered = filteredBookmarks();
 
+    const finalSortedBookmarks = [...filtered].sort((a, b) => {
+    // 1. Priority: Pinned items always come first
+    if (a.isPinned !== b.isPinned) {
+      return a.isPinned ? -1 : 1;
+    }
+
+    // 2. Secondary: Apply the selected sort criteria
+    switch (sortBy) {
+      case "recently_visited":
+        return (
+          new Date(b.lastVisited || 0).getTime() -
+          new Date(a.lastVisited || 0).getTime()
+        );
+      case "most_visited":
+        return (b.viewCount || 0) - (a.viewCount || 0);
+      case "recently_added":
+      default:
+        return (
+          new Date(b.dateAdded || 0).getTime() -
+          new Date(a.dateAdded || 0).getTime()
+        );
+    }
+  });
+
   return (
     <div className="px-6 py-6">
       <div className="flex justify-between ml-5">
         <h1 className="text-2xl font-semibold">Archived Bookmarks</h1>
         <div className="flex items-center justify-between gap-2">
+          <SortByDropdown currentSort={sortBy} onSortChange={setSortBy} />
           <Button
             variant="ghost"
             aria-label="Toggle layout"
@@ -59,13 +85,20 @@ export default function ArchivedBookmarksPage() {
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="text-gray-500 p-6">No archived bookmarks found.</p>
+      ) : finalSortedBookmarks.length === 0 ? (
+        <div className="w-full mt-26 flex justify-center items-center">
+          <p className="text-gray-500 p-6">No archived bookmarks found.</p>
+          <Link href="/" passHref>
+            <Button variant="secondary">
+              View All Bookmarks
+            </Button>
+          </Link>
+        </div>        
       ) : (
         <div
           className={`grid gap-4 p-6 ${isGrid ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}
         >
-          {filtered.map((b, index) => (
+          {finalSortedBookmarks.map((b, index) => (
             <BookmarkCard key={b.id ?? index} bookmark={b} />
           ))}
         </div>
