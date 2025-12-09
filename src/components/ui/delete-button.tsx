@@ -14,11 +14,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export function DeleteAccountButton() {
-  const router = useRouter();
   const [confirmation, setConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
 

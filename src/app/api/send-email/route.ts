@@ -1,6 +1,5 @@
-// auth.ts
-import { betterAuth } from "better-auth";
-import { sendEmail } from "@/lib/brevo"; // your email sending function
+// src/app/api/send-email/route.ts
+import { sendEmail } from "@/lib/brevo";
 
 interface SendVerificationEmailParams {
   user: {
@@ -11,17 +10,23 @@ interface SendVerificationEmailParams {
   token: string;
 }
 
-export const auth = betterAuth({
-  emailVerification: {
-    sendVerificationEmail: async ({ user, url }: SendVerificationEmailParams) => {
-      await sendEmail({
-        to: user.email,
-        templateId: 1, // Your Brevo template ID
-        params: {
-          VERIFICATION_URL: url,          
-          USERNAME: user.name || "User",  
-        },
-      });
-    },
-  },
-});
+export async function POST(req: Request) {
+  try {
+    const { user, url } = (await req.json()) as SendVerificationEmailParams;
+
+    // Send email directly
+    await sendEmail({
+      to: user.email,
+      templateId: 1,
+      params: {
+        VERIFICATION_URL: url,
+        USERNAME: user.name || "User",
+      },
+    });
+
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Failed to send email" }), { status: 500 });
+  }
+}

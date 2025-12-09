@@ -16,7 +16,7 @@ export const auth = betterAuth({
     signUp: {
       autoSignIn: false,
     },
-    sendResetPassword: async ({ user, url, token }, request) => {
+    sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
         templateId: 2, // Brevo template ID
@@ -26,7 +26,7 @@ export const auth = betterAuth({
         },
       });
     },
-    onPasswordReset: async ({ user }, request) => {
+    onPasswordReset: async ({ user }) => {
       // your logic here
       console.log(`Password for user ${user.email} has been reset.`);
     },

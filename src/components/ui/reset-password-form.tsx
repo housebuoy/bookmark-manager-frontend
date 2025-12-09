@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // ⬅️ Import useEffect
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,27 +14,41 @@ export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [token, setToken] = useState<string | null>(null); // ⬅️ State for token
   const router = useRouter();
 
-  const token = new URLSearchParams(window.location.search).get("token");
+  // ⬅️ FIX: Defer client-side code to run only after mounting
+  useEffect(() => {
+    // This code only runs in the browser where 'window' exists.
+    const urlParams = new URLSearchParams(window.location.search);
+    const fetchedToken = urlParams.get("token");
+    setToken(fetchedToken);
+    
+    if (!fetchedToken) {
+        // Optional: Immediately redirect if no token is found on the client
+        toast.error("Invalid or missing token in URL.");
+        router.replace("/forgot-password");
+    }
+  }, [router]); // Depend on router for replace function
 
   const handleResetPassword = async () => {
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return; // stop the function
+    // Check if the token state is loaded
+    if (!token) {
+      toast.error("Token is still loading or invalid.");
+      return; 
     }
 
-    if (!token) {
-      toast.error("Invalid or missing token");
-      router.replace("/forgot-password");
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
       return;
     }
 
     setLoading(true);
 
     try {
+      // Use the token from the component state
       const { error } = await authClient.resetPassword({
-        newPassword, // use state value
+        newPassword,
         token,
       });
 
@@ -52,12 +66,23 @@ export default function ResetPasswordPage() {
     }
   };
 
+  // Optional: Show a loading state if the token hasn't been parsed yet
+  if (token === null) {
+      return (
+          <div className="min-h-screen flex items-center justify-center">
+              <Loader2 size={32} className="animate-spin text-gray-400" />
+          </div>
+      );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
       <div className="w-full bg-white dark:bg-gray-800">
         <h1 className="text-xl font-semibold mb-4 text-left text-gray-900 dark:text-white">
           Reset Password
         </h1>
+
+        {/* ... form content remains the same, using 'newPassword' and 'confirmPassword' ... */}
 
         <div className="grid gap-4">
           <div className="grid gap-2">
@@ -82,7 +107,7 @@ export default function ResetPasswordPage() {
 
           <Button
             onClick={handleResetPassword}
-            disabled={loading}
+            disabled={loading || !token} // Disable button if loading or token is missing
             className="w- bg-[#054744]"
           >
             {loading ? (

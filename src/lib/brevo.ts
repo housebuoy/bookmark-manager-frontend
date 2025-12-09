@@ -1,24 +1,29 @@
-import * as SibApiV3Sdk from "sib-api-v3-typescript";
+import * as Brevo from "@getbrevo/brevo";
 
-// Create an instance of the transactional email API
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+// Create the API instance
+const apiInstance = new Brevo.TransactionalEmailsApi();
 
-// Set your API key
-apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY || "");
+// Use the enum for the key type
+apiInstance.setApiKey(
+  Brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY || ""
+);
 
-// Define the email sending function
-interface SendEmailOptions {
+// Email sending function
+export async function sendEmail({
+  to,
+  templateId,
+  params = {},
+}: {
   to: string;
   templateId: number;
-  params: Record<string, unknown>;
-}
+  params?: Record<string, unknown>;
+}) {
+  const emailData = new Brevo.SendSmtpEmail();
+  emailData.to = [{ email: to }];
+  emailData.templateId = templateId;
+  emailData.params = params;
 
-export async function sendEmail({ to, templateId, params }: SendEmailOptions) {
-  const sendSmtpEmail: SibApiV3Sdk.SendSmtpEmail = {
-    to: [{ email: to }],
-    templateId,
-    params,
-  };
-
-  return apiInstance.sendTransacEmail(sendSmtpEmail);
+  // headers can be empty if you don't need custom headers
+  return apiInstance.sendTransacEmail(emailData, { headers: {} });
 }

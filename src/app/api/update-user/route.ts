@@ -16,8 +16,10 @@ export async function POST(req: Request) {
   // Update email separately (with verification)
   if (body.email) {
     await auth.api.changeEmail({
-      newEmail: body.email,
-      callbackURL: "/dashboard",
+      body: {
+        newEmail: body.email,
+        callbackURL: "/dashboard",
+      },
     });
   }
 

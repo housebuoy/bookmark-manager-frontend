@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Grid, List } from "lucide-react";
+import { ChevronLeft, ChevronRight, Grid, List } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BookmarkCard } from "@/components/ui/bookmark-card";
 import { useBookmarkStore } from "@/stores/bookmark-store";
@@ -10,8 +10,11 @@ import { SortByDropdown } from "@/components/ui/sort-by-dropdown";
 export default function Home() {
   const [isGrid, setIsGrid] = useState(true);
   const [loading, setLoading] = useState(true);
+  const ITEMS_PER_PAGE = 12;
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { loadBookmarks, filteredBookmarks, sortBy, setSortBy, refreshKey } = useBookmarkStore();
+  const { loadBookmarks, filteredBookmarks, sortBy, setSortBy, refreshKey } =
+    useBookmarkStore();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -21,6 +24,10 @@ export default function Home() {
     };
     fetchData();
   }, [loadBookmarks, refreshKey]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortBy]);
 
   const filtered = filteredBookmarks();
 
@@ -47,7 +54,20 @@ export default function Home() {
         );
     }
   });
-  
+
+  const totalItems = finalSortedBookmarks.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+
+  // Slice the sorted list to get only the items for the current page
+  const paginatedBookmarks = finalSortedBookmarks.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   return (
     <div className="px-6 py-6">
@@ -61,7 +81,11 @@ export default function Home() {
             onClick={() => setIsGrid(!isGrid)}
             className="gap-1 hidden sm:flex cursor-pointer bg-accent text-accent-foreground hover:bg-accent/30 items-center"
           >
-            {isGrid ? <List className="h-5 w-5" /> : <Grid className="h-5 w-5" />}
+            {isGrid ? (
+              <List className="h-5 w-5" />
+            ) : (
+              <Grid className="h-5 w-5" />
+            )}
             {isGrid ? <p>List</p> : <p>Grid</p>}
           </Button>
         </div>
@@ -87,9 +111,37 @@ export default function Home() {
             isGrid ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
           }`}
         >
-          {finalSortedBookmarks.map((b, index) => (
+          {paginatedBookmarks.map((b, index) => (
             <BookmarkCard key={b.id ?? index} bookmark={b} />
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       )}
     </div>

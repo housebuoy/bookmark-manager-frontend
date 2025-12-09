@@ -1,4 +1,5 @@
 "use client";
+// import React from "react";
 import { useBookmarkStore } from "@/stores/bookmark-store";
 import { useEffect, useMemo, useState } from "react";
 import { FaGoogle } from "react-icons/fa";
@@ -49,44 +50,38 @@ export default function ProfileClient() {
     providerId?: string;
   };
 
-  const { session } = useSession();
-  const user: User = useMemo(() => {
-    if (!session) return {} as User;
+const { session, user: ctxUser } = useSession();
 
-    if (
-      typeof session === "object" &&
-      "user" in session &&
-      (session as Record<string, unknown>).user
-    ) {
-      const u = (session as Record<string, unknown>).user as Record<
-        string,
-        unknown
-      >;
-      return {
-        name: u.name as string | undefined,
-        email: u.email as string | undefined,
-        image: (u.image ?? undefined) as string | undefined,
-        createdAt: u.createdAt as Date | undefined,
-        emailVerified: u.emailVerified as boolean | undefined,
-        providerId: u.providerId as string | undefined,
-      } as User;
-    }
+const user: User = useMemo(() => {
+  if (!session) return {} as User;
 
-    // Otherwise assume session itself might already represent the user shape.
-    const s = session as Record<string, unknown>;
+  if ("user" in session && session.user) {
+    const u = session.user as unknown as User;
     return {
-      name: s.name as string | undefined,
-      email: s.email as string | undefined,
-      image: (s.image ?? undefined) as string | undefined,
-      createdAt: s.createdAt as Date | undefined,
-      emailVerified: s.emailVerified as boolean | undefined,
-      providerId: s.providerId as string | undefined,
-    } as User;
-  }, [session]);
+      name: u.name,
+      email: u.email,
+      image: u.image,
+      createdAt: u.createdAt,
+      emailVerified: u.emailVerified,
+      providerId: u.providerId,
+    };
+  }
+
+  const s = session as unknown as User;
+  return {
+    name: s.name,
+    email: s.email,
+    image: s.image,
+    createdAt: s.createdAt,
+    emailVerified: s.emailVerified,
+    providerId: s.providerId,
+  };
+}, [session]);
+
 
   const { theme, setTheme } = useTheme();
-  const [userName, setUserName] = useState(user?.name || "");
-  const [userEmail, setUserEmail] = useState(user?.email || "");
+  const [userName, setUserName] = useState(ctxUser?.name || "");
+  const [userEmail, setUserEmail] = useState(ctxUser?.email || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -174,10 +169,10 @@ export default function ProfileClient() {
     );
   }
 
-  const dummyPasskeys = [
-    { id: "1", name: "MacBook Pro TouchID", icon: "laptop_mac" },
-    { id: "2", name: "iPhone FaceID", icon: "smartphone" },
-  ];
+  // const dummyPasskeys = [
+  //   { id: "1", name: "MacBook Pro TouchID", icon: "laptop_mac" },
+  //   { id: "2", name: "iPhone FaceID", icon: "smartphone" },
+  // ];
 
   const themeOptions = [
     {
@@ -277,7 +272,7 @@ export default function ProfileClient() {
         >
           <div className="relative group">
             <Avatar className="rounded-full ring-4 ring-[#054744] dark:ring-[#054744]/50 w-20 h-20">
-              <AvatarImage src={user?.image} alt="User avatar" />
+              <AvatarImage src={ctxUser?.image ?? undefined} alt="User avatar" />
               <AvatarFallback>
                 {userName?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
@@ -487,7 +482,7 @@ export default function ProfileClient() {
                 className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
               <div className="w-full flex justify-end">
-                <Link href="#" className="text-sm text-right underline">
+                <Link href="/forgot-password" className="text-sm text-right underline">
                   Forgot password?
                 </Link>
               </div>
