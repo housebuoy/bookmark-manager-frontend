@@ -1,45 +1,34 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  output   = "./generated/prisma"
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  provider = "postgresql"
 }
 
 model User {
-  id            String    @id
+  id            String     @id
   name          String
-  email         String
-  emailVerified Boolean   @default(false)
+  email         String     @unique
+  emailVerified Boolean    @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @default(now()) @updatedAt
-  
-  sessions      Session[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
   accounts      Account[]
+  bookmarks     Bookmark[]
   passkeys      Passkey[]
-
-  // 1. Add this line to link to bookmarks
-  bookmarks     Bookmark[] 
+  sessions      Session[]
   tags          Tag[]
 
-  @@unique([email])
   @@map("user")
 }
 
 model Session {
   id        String   @id
   expiresAt DateTime
-  token     String
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   ipAddress String?
@@ -47,7 +36,6 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([token])
   @@map("session")
 }
 
@@ -56,7 +44,6 @@ model Account {
   accountId             String
   providerId            String
   userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
   refreshToken          String?
   idToken               String?
@@ -66,6 +53,7 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account")
 }
@@ -82,21 +70,18 @@ model Verification {
 }
 
 model Bookmark {
-  id           String    @id @db.Uuid
-  date_added   DateTime? @db.Timestamp(6)
-  description  String?
-  favicon      String?   @db.VarChar(255)
-  is_archived  Boolean
-  is_pinned    Boolean
-  last_visited DateTime? @db.Timestamp(6)
-  title        String?   @db.VarChar(255)
-  url          String?   @db.VarChar(255)
-  view_count   Int
-  
-  // 2. Add the relation fields here
-  userId       String?   // Optional for now, so existing data doesn't break
-  user         User?     @relation(fields: [userId], references: [id])
-
+  id            String          @id @db.Uuid
+  date_added    DateTime?       @db.Timestamp(6)
+  description   String?
+  favicon       String?         @db.VarChar(255)
+  is_archived   Boolean
+  is_pinned     Boolean
+  last_visited  DateTime?       @db.Timestamp(6)
+  title         String?         @db.VarChar(255)
+  url           String?         @db.VarChar(255)
+  view_count    Int
+  userId        String?
+  user          User?           @relation(fields: [userId], references: [id])
   bookmark_tags Bookmark_tags[]
 
   @@map("bookmark")
@@ -115,12 +100,12 @@ model Bookmark_tags {
 model Tag {
   id            BigInt          @id @default(autoincrement())
   name          String?         @db.VarChar(255)
-  userId        String?         
-  user          User?           @relation(fields: [userId], references: [id])
+  userId        String?
   bookmark_tags Bookmark_tags[]
+  user          User?           @relation(fields: [userId], references: [id])
 
-  @@map("tag")
   @@unique([name, userId])
+  @@map("tag")
 }
 
 model Passkey {
@@ -128,7 +113,6 @@ model Passkey {
   name         String?
   publicKey    String
   userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   credentialID String
   counter      Int
   deviceType   String
@@ -136,6 +120,7 @@ model Passkey {
   transports   String?
   createdAt    DateTime?
   aaguid       String?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("passkey")
 }
