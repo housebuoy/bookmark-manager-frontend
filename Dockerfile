@@ -15,14 +15,17 @@ ENV DATABASE_URL=$DATABASE_URL
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --prefer-offline --no-audit || \
+    =npm ci --ignore-scripts --prefer-offline --no-audit || \
+    (rm -rf node_modules package-lock.json && npm install --ignore-scripts) 
 
-# --- CRITICAL FIX FOR PRISMA ---
-# Explicitly copy the prisma directory here to ensure it's available in the builder stage
+# --- CRITICAL FIX FOR NATIVE MODULES ---
+# Force optional packages installation and rebuild the lightningcss module
+RUN npm install --include=optional && npm rebuild lightningcss
+# ----------------------------------------
+
 COPY prisma ./prisma 
 COPY prisma.config.ts ./
-# ---
-
 COPY . .
 RUN npm run build 
 # All necessary files (including prisma/schema.prisma) are now in /app

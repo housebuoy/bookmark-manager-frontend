@@ -9,7 +9,7 @@ import { sendEmail } from "@/lib/brevo"; // Brevo email sending function
 // const prisma = new PrismaClient();
 
 export const auth = betterAuth({
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  database: prismaAdapter(prisma, { provider: "postgresql"}),
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

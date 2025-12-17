@@ -37,6 +37,7 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
+  
 }
 
 model Account {
@@ -56,6 +57,7 @@ model Account {
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("account")
+  
 }
 
 model Verification {
@@ -67,6 +69,7 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@map("verification")
+  
 }
 
 model Bookmark {
@@ -80,11 +83,12 @@ model Bookmark {
   title         String?         @db.VarChar(255)
   url           String?         @db.VarChar(255)
   view_count    Int
-  userId        String?
+  userId        String?         @map("user_id")
   user          User?           @relation(fields: [userId], references: [id])
   bookmark_tags Bookmark_tags[]
 
   @@map("bookmark")
+  
 }
 
 model Bookmark_tags {
@@ -95,17 +99,19 @@ model Bookmark_tags {
 
   @@id([bookmark_id, tag_id])
   @@map("bookmark_tags")
+  
 }
 
 model Tag {
   id            BigInt          @id @default(autoincrement())
   name          String?         @db.VarChar(255)
-  userId        String?
+  userId        String?         @map("user_id")
   bookmark_tags Bookmark_tags[]
   user          User?           @relation(fields: [userId], references: [id])
 
   @@unique([name, userId])
   @@map("tag")
+  
 }
 
 model Passkey {
@@ -123,4 +129,5 @@ model Passkey {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("passkey")
+  
 }
